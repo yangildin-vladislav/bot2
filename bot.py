@@ -155,7 +155,6 @@ async def process_one(update, image_bytes, settings):
     font_size = int(settings["font_size"])
     text1     = settings["text1"]
     text2     = settings["text2"]
-    neon      = (style == "3")
     try:
         img1 = render_image(image_bytes, text1, style, font_size)
         img2 = render_image(image_bytes, text2, style, font_size)
@@ -163,6 +162,30 @@ async def process_one(update, image_bytes, settings):
         await update.message.reply_document(io.BytesIO(img2), filename=f"{n} - правое.jpg", caption=f"🎵 {n} | текст трека")
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка на фото {n}: {e}")
+
+async def process_batch_to_zip(update, names, zf_in, settings):
+    """Обрабатывает все фото и возвращает zip в памяти."""
+    zip_buffer = io.BytesIO()
+    total = len(names)
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf_out:
+        for i, name in enumerate(names, 1):
+            img_bytes = zf_in.read(name)
+            n = get_next_counter()
+            style     = settings["style"]
+            font_size = int(settings["font_size"])
+            text1     = settings["text1"]
+            text2     = settings["text2"]
+            try:
+                img1 = render_image(img_bytes, text1, style, font_size)
+                img2 = render_image(img_bytes, text2, style, font_size)
+                zf_out.writestr(f"{n} - левое.jpg",  img1)
+                zf_out.writestr(f"{n} - правое.jpg", img2)
+            except Exception as e:
+                await update.message.reply_text(f"❌ Ошибка на фото {n}: {e}")
+            if i % 10 == 0:
+                await update.message.reply_text(f"⏳ Обработано {i}/{total}...")
+    zip_buffer.seek(0)
+    return zip_buffer
 
 # ─── ХЕНДЛЕРЫ ────────────────────────────
 
@@ -250,17 +273,15 @@ async def receive_zip(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return WAIT_IMAGE
 
         total = len(names)
-        await update.message.reply_text(f"🔍 Нашёл {total} фото, обрабатываю...\nЭто может занять немного времени ⏳")
+        await update.message.reply_text(f"🔍 Нашёл {total} фото, создаю архив...\nЭто может занять немного времени ⏳")
 
-        for i, name in enumerate(names, 1):
-            img_bytes = zf.read(name)
-            context.user_data["image"] = img_bytes
-            await process_one(update, img_bytes, tmpl)
-            # Прогресс каждые 10 фото
-            if i % 10 == 0:
-                await update.message.reply_text(f"✅ Обработано {i}/{total}...")
+        zip_result = await process_batch_to_zip(update, names, zf, tmpl)
 
-    await update.message.reply_text(f"🎉 Готово! Обработано {total} фото")
+    await update.message.reply_document(
+        document=zip_result,
+        filename="result.zip",
+        caption=f"🎉 Готово! {total} фото → {total*2} картинок в архиве"
+    )
     context.user_data.clear()
     return WAIT_IMAGE
 
