@@ -10,7 +10,7 @@ from telegram.ext import (
 )
 from PIL import Image, ImageDraw, ImageFont
 
-BOT_TOKEN = "ВАШ_ТОКЕН_ЗДЕСЬ"
+BOT_TOKEN = "8463686645:AAEdU7o2fX_UtaJFh7OhAJvI9Jt2pBSiAig"
 TEMPLATE_FILE = "template.json"
 COUNTER_FILE  = "counter.json"
 
