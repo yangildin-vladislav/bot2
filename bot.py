@@ -10,7 +10,7 @@ from telegram.ext import (
 )
 from PIL import Image, ImageDraw, ImageFont
 
-BOT_TOKEN = "8463686645:AAEdU7o2fX_UtaJFh7OhAJvI9Jt2pBSiAig"
+BOT_TOKEN = "ВАШ_ТОКЕН_ЗДЕСЬ"
 TEMPLATE_FILE = "template.json"
 COUNTER_FILE  = "counter.json"
 
@@ -18,6 +18,8 @@ COUNTER_FILE  = "counter.json"
 
 FONT_URL  = "https://github.com/google/fonts/raw/main/ofl/opensans/OpenSans%5Bwdth%2Cwght%5D.ttf"
 FONT_PATH = "fonts/OpenSans.ttf"
+IMPACT_URL  = "https://github.com/google/fonts/raw/main/ofl/oswald/Oswald%5Bwght%5D.ttf"
+IMPACT_PATH = "fonts/Impact.ttf"
 
 FONT_MENU = (
     "🎨 Выбери стиль — отправь цифру:\n\n"
@@ -25,7 +27,8 @@ FONT_MENU = (
     "2 — Жирный (многослойная тень)\n"
     "3 — Неон (голубое свечение)\n"
     "4 — Тень снизу\n"
-    "5 — Белый с чёрной обводкой"
+    "5 — Белый с чёрной обводкой\n"
+    "6 — IMPACT (капс + полужирный)"
 )
 
 SIZE_MENU = (
@@ -51,12 +54,18 @@ def get_next_counter():
 def ensure_font():
     os.makedirs("fonts", exist_ok=True)
     if not os.path.exists(FONT_PATH):
-        print("⬇️ Скачиваю шрифт...")
+        print("⬇️ Скачиваю шрифт OpenSans...")
         urllib.request.urlretrieve(FONT_URL, FONT_PATH)
-        print("✅ Шрифт скачан!")
+        print("✅ OpenSans скачан!")
+    if not os.path.exists(IMPACT_PATH):
+        print("⬇️ Скачиваю шрифт Impact (Oswald)...")
+        urllib.request.urlretrieve(IMPACT_URL, IMPACT_PATH)
+        print("✅ Impact скачан!")
 
-def get_font(size):
+def get_font(size, impact=False):
     try:
+        if impact and os.path.exists(IMPACT_PATH):
+            return ImageFont.truetype(IMPACT_PATH, size)
         if os.path.exists(FONT_PATH):
             return ImageFont.truetype(FONT_PATH, size)
         for fb in [
@@ -105,7 +114,11 @@ def render_image(image_bytes, text, style, font_size):
     img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
     draw = ImageDraw.Draw(img)
     w, h = img.size
-    font = get_font(font_size)
+    is_impact = (style == "6")
+    # IMPACT — всегда капс
+    if is_impact:
+        text = text.upper()
+    font = get_font(font_size, impact=is_impact)
     lines = wrap_text(draw, text, font, int(w * 0.88))
     line_height = int(font_size * 1.4)
     total_h = line_height * len(lines)
@@ -142,6 +155,19 @@ def render_image(image_bytes, text, style, font_size):
                 for dy in range(-s, s+1):
                     if abs(dx) == s or abs(dy) == s:
                         draw.text((x+dx, y+dy), line, font=font, fill=(0, 0, 0, 255))
+            draw.text((x, y), line, font=font, fill=(255, 255, 255, 255))
+
+        elif style == "6":  # IMPACT — полужирный эффект + обводка
+            s = max(3, font_size // 18)
+            # Чёрная обводка
+            for dx in range(-s, s+1):
+                for dy in range(-s, s+1):
+                    if abs(dx) == s or abs(dy) == s:
+                        draw.text((x+dx, y+dy), line, font=font, fill=(0, 0, 0, 255))
+            # Полужирный эффект — рисуем текст несколько раз со смещением в 1px
+            for bx in range(-1, 2):
+                for by in range(-1, 2):
+                    draw.text((x+bx, y+by), line, font=font, fill=(255, 255, 255, 230))
             draw.text((x, y), line, font=font, fill=(255, 255, 255, 255))
 
     out = io.BytesIO()
@@ -191,7 +217,7 @@ async def process_batch_to_zip(update, names, zf_in, settings):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tmpl = load_template()
-    style_names = {"1":"Обычный","2":"Жирный","3":"Неон","4":"Тень","5":"Обводка"}
+    style_names = {"1":"Обычный","2":"Жирный","3":"Неон","4":"Тень","5":"Обводка","6":"IMPACT"}
     if tmpl:
         await update.message.reply_text(
             "👋 Привет!\n\n"
@@ -287,11 +313,11 @@ async def receive_zip(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def receive_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     txt = update.message.text.strip()
-    if txt not in ["1","2","3","4","5"]:
-        await update.message.reply_text("Отправь цифру от 1 до 5 👆")
+    if txt not in ["1","2","3","4","5","6"]:
+        await update.message.reply_text("Отправь цифру от 1 до 6 👆")
         return WAIT_FONT
     context.user_data["style"] = txt
-    styles = {"1":"Обычный","2":"Жирный","3":"Неон","4":"Тень","5":"Обводка"}
+    styles = {"1":"Обычный","2":"Жирный","3":"Неон","4":"Тень","5":"Обводка","6":"IMPACT"}
     await update.message.reply_text(f"✅ Стиль: {styles[txt]}\n\n{SIZE_MENU}")
     return WAIT_SIZE
 
