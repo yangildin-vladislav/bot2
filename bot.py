@@ -65,9 +65,12 @@ def ensure_font():
 def get_font(size, impact=False):
     try:
         if impact and os.path.exists(IMPACT_PATH):
-            return ImageFont.truetype(IMPACT_PATH, size)
+            # index=0 берёт первый шрифт из файла
+            # layout_engine=ImageFont.Layout.BASIC помогает с кернингом
+            font = ImageFont.truetype(IMPACT_PATH, size, index=0)
+            return font
         if os.path.exists(FONT_PATH):
-            return ImageFont.truetype(FONT_PATH, size)
+            return ImageFont.truetype(FONT_PATH, size, index=0)
         for fb in [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
@@ -115,9 +118,14 @@ def render_image(image_bytes, text, style, font_size):
     draw = ImageDraw.Draw(img)
     w, h = img.size
     is_impact = (style == "6")
-    # IMPACT — всегда капс
+    # IMPACT — всегда капс + небольшой интервал между буквами
     if is_impact:
         text = text.upper()
+        # Добавляем пробел между каждой буквой для разделения
+        spaced = []
+        for line in text.split("\n"):
+            spaced.append(" ".join(line))
+        text = "\n".join(spaced)
     font = get_font(font_size, impact=is_impact)
     lines = wrap_text(draw, text, font, int(w * 0.88))
     line_height = int(font_size * 1.4)
@@ -157,17 +165,14 @@ def render_image(image_bytes, text, style, font_size):
                         draw.text((x+dx, y+dy), line, font=font, fill=(0, 0, 0, 255))
             draw.text((x, y), line, font=font, fill=(255, 255, 255, 255))
 
-        elif style == "6":  # IMPACT — полужирный эффект + обводка
-            s = max(3, font_size // 18)
-            # Чёрная обводка
+        elif style == "6":  # IMPACT — чистый с тонкой обводкой
+            s = max(2, font_size // 25)
+            # Тонкая чёрная обводка только по краю
             for dx in range(-s, s+1):
                 for dy in range(-s, s+1):
                     if abs(dx) == s or abs(dy) == s:
                         draw.text((x+dx, y+dy), line, font=font, fill=(0, 0, 0, 255))
-            # Полужирный эффект — рисуем текст несколько раз со смещением в 1px
-            for bx in range(-1, 2):
-                for by in range(-1, 2):
-                    draw.text((x+bx, y+by), line, font=font, fill=(255, 255, 255, 230))
+            # Чистый белый текст — без многослойности
             draw.text((x, y), line, font=font, fill=(255, 255, 255, 255))
 
     out = io.BytesIO()
