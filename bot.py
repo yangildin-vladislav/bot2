@@ -118,14 +118,8 @@ def render_image(image_bytes, text, style, font_size):
     draw = ImageDraw.Draw(img)
     w, h = img.size
     is_impact = (style == "6")
-    # IMPACT — всегда капс + небольшой интервал между буквами
     if is_impact:
         text = text.upper()
-        # Добавляем пробел между каждой буквой для разделения
-        spaced = []
-        for line in text.split("\n"):
-            spaced.append(" ".join(line))
-        text = "\n".join(spaced)
     font = get_font(font_size, impact=is_impact)
     lines = wrap_text(draw, text, font, int(w * 0.88))
     line_height = int(font_size * 1.4)
